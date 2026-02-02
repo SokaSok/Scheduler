@@ -137,7 +137,8 @@ const App = {
         });
 
         // Render Body Rows
-        APP_STATE.days.forEach((dayName, dayIndex) => {
+        const {cols, days} = APP_STATE
+        days.forEach((dayName, dayIndex) => {
             let row = createEl('div', { classes: 'scheduler-row' });
             
             // Day Label
@@ -145,23 +146,21 @@ const App = {
 
             // Cells
             let colIndex = 0;
-            while (colIndex < APP_STATE.cols.length) {
-                const evt = APP_STATE.events.find(e => e.day === dayIndex && e.colIndex === colIndex);
+            while (colIndex < cols.length) {
                 const currentColIndex = colIndex;
-                // console.log(dayName,dayIndex,colIndex,evt)
+                const evt = APP_STATE.events.find(e => e.day === dayIndex && e.colIndex === currentColIndex);
                 if (evt) {
                     // Event Cell
                     let cell = this.createEventCell(evt);
                     // Apply colspan
                     let span = evt.colspan || 1;
-                    cell.style.flexGrow = span;
-                    cell.style.width = `${(span / APP_STATE.cols.length) * 100}%`; // Approximation
+                    cell.style.width = `${(span / cols.length) * 100}%`; // Approximation
                     row.appendChild(cell);
                     colIndex += span;
                 } else {
                     // Empty Cell
                     let cell = createEl('div', {
-                        classes: 'event-cell hover:bg-gray-50',
+                        classes: `event-cell hover:bg-gray-50 w-[${1 / cols.length * 100}%]`,
                         innerText : `row: ${dayIndex}, col: ${currentColIndex}`,
                         triggers: {
                             click: (() => this.createEvent(dayIndex, currentColIndex)).bind(this),
@@ -178,10 +177,10 @@ const App = {
     },
 
     createEventCell(evt) {
-        const tag = APP_STATE.tags.find(t => t.id === evt.tagId) || APP_STATE.tags[0];
+        const tag = App.tagTable.values.find(t => t.id === evt.tagId) || App.tagTable.values[0];
         
         // Color Logic
-        let parentTag = tag.parent ? APP_STATE.tags.find(t => t.id === tag.parent) : null;
+        let parentTag = tag.parent ? App.tagTable.values.find(t => t.id === tag.parent) : null;
         let baseTag = parentTag || tag; // Use parent for borders if exists
         
         let hue = tag.h;
@@ -198,7 +197,7 @@ const App = {
                 'color': text
             },
             triggers: {
-                dblclick: () => this.openEventModal(evt.id),
+                dblclick: (() => this.openEventModal(evt.id)).bind(this),
                 dragstart: (e) => {
                     e.dataTransfer.setData('text/plain', evt.id);
                     e.target.classList.add('dragging');
@@ -229,7 +228,7 @@ const App = {
         let tagList = createEl('div', { classes: 'custom-select-list' });
         // Add tag options...
         // (Simplified for brevity: in production, render full list with "Create New")
-        APP_STATE.tags.forEach(t => {
+        App.tagTable.values.forEach(t => {
             let item = createEl('div', {
                 classes: 'custom-select-item text-xs',
                 innerHTML: `${t.emoji} ${t.name}`,
@@ -258,7 +257,7 @@ const App = {
                                 h: Math.floor(Math.random()*360),
                                 bg_s: 85, bg_l: 92, border_s: 70, border_l: 40, text_l: 20
                             };
-                            APP_STATE.tags.push(newTag);
+                            App.tagTable.values.push(newTag);
                             evt.tagId = newTag.id;
                             this.renderAll();
                         }
@@ -290,7 +289,7 @@ const App = {
             colIndex: colIndex,
             colspan: 1,
             title: '',
-            tagId: APP_STATE.tags[0].id,
+            tagId: App.tagTable.values[0].id,
             details: ''
         };
         APP_STATE.events.push(newEvt);
@@ -368,7 +367,7 @@ const App = {
         // Populate Tag Select
         const sel = document.getElementById('evt-tag-select');
         sel.innerHTML = '';
-        APP_STATE.tags.forEach(t => sel.add(new Option(`${t.emoji} ${t.name}`, t.id)));
+        App.tagTable.values.forEach(t => sel.add(new Option(`${t.emoji} ${t.name}`, t.id)));
         sel.value = evt.tagId;
 
         APP_STATE.editor.setMarkdown(evt.details || '');
@@ -456,7 +455,7 @@ function promptAddColumn() {
 }
 
 function addNewTag() {
-    APP_STATE.tags.push({ id: 't'+Date.now(), name: 'Nuovo', emoji: '🏷️', h: 200, bg_s: 90, bg_l: 90, border_s: 70, border_l: 40, text_l: 20 });
+    App.tagTable.values.push({ id: 't'+Date.now(), name: 'Nuovo', emoji: '🏷️', h: 200, bg_s: 90, bg_l: 90, border_s: 70, border_l: 40, text_l: 20 });
     App.renderAll();
 }
 
