@@ -1,0 +1,181 @@
+:root {
+    --table-title-hgt : 2rem;
+}
+
+/* --- LAYOUT GENERALE TABELLA --- */
+.table_title {
+    padding: .3rem;
+    font-size: 1.1rem;
+    height: var(--table-title-hgt) !important;
+    position: relative;
+}
+.table_title em {
+    font-weight: bold;
+    font-style: normal;
+}
+
+.table {
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    display: flex;
+    flex-direction: row;
+    background-color: var(--bg-pmr);
+    position: relative;
+    --ch-wtd : 4rem;
+    --table-hd-hgt : 2.5rem;
+    --table-ft-hgt : 1.5rem;
+    overflow: hidden;
+}
+
+/* Se la tabella ha un titolo esterno, si adatta */
+*:has(> .table_title) > .table {
+    height: calc(100% - var(--table-title-hgt));
+}
+
+/* --- CONTENITORE COLONNE --- */
+.table > .columns_container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    overflow: auto;
+    flex-wrap: nowrap;
+}
+
+/* Adattamento altezza se c'è footer */
+.table:has(.footer) > .columns_container {
+    height: calc(100% - var(--table-ft-hgt));
+}
+
+.table .column {
+    height: max-content;
+    width: var(--width, 20%);
+    min-width: 0;
+    order: var(--order);
+    /* In table.js di solito flex-grow è gestito inline o tramite classi specifiche, 
+       qui è importante che la colonna sia flex container se contiene celle */
+}
+
+/* --- CELLE --- */
+.cell {
+    background-color: hsl(var(--h), var(--s), var(--l));
+    position: relative;
+    overflow: visible;
+    --h : 200;
+}
+
+.cell > * {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 2px;
+    overflow: visible;
+}
+
+.cell > span,
+.cell > span > * {
+    font-size: .75rem;
+    max-width: 100%;
+}
+
+.cell > span {
+    overflow-y: auto;
+}
+
+/* --- HEADER --- */
+.header.cell {
+    height: var(--table-hd-hgt);
+    font-size: 1em !important;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    font-weight: bold;
+    --s: 30%;
+    --l: 40%;
+    border-bottom: 2px solid hsl(var(--h), 90%, 20%);
+    color: var(--sp-cl0);    
+}
+
+/* --- CELLE DATI (Non Header) --- */
+.cell:not(.header) {
+    border-bottom: 1px solid hsl(var(--h), 60%, 70%);
+    /* border-right: 1px solid var(--border-color); */
+    height: 40px;
+    /* Gestione animazione ingresso */
+    opacity: 0;
+    transform : scale(0);
+    overflow: visible;
+    color : var(--bg-dark);
+}
+
+/* Colori alternati righe (Zebra striping) */
+.cell:not(.header):nth-child(odd) {
+    --s: 45%;
+    --l: 94%;
+}
+.cell:not(.header):nth-child(even) {
+    --s: 75%;
+    --l: 85%;
+}
+
+/* Stati speciali celle */
+.cell.show {
+    animation: appari .2s ease-out forwards;
+    animation-delay: calc(.03s * var(--delay));
+}
+
+.cell.selected {
+    filter: brightness(.8);
+}
+
+.cell.updated {
+    background-color: var(--mod-clr);
+}
+
+/* --- FOOTER --- */
+.table .footer {
+    height: var(--table-ft-hgt);
+    border-top: var(--bd-snd) 2px solid;
+    width: 100%;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    --s: 30%;
+    --l: 40%;
+    background-color: hsl(var(--h),var(--s),var(--l));
+}
+
+/* --- DROPDOWN E INPUT INTERNI --- */
+.cell > span:has(textarea) {
+    padding: 0;
+}
+.cell > span > textarea {
+    resize: none;
+    height: 100%;
+    border: none;
+    padding: 3px;
+    background-color: antiquewhite;
+}
+.cell .dropdown_text_option {
+    background-color: hsla(var(--h),var(--s),var(--l),.95);
+}
+
+/* --- ANIMAZIONI RICHIESTE --- */
+@keyframes appari {
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

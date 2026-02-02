@@ -1,0 +1,144 @@
+:root {
+    --table-title-hgt : 2rem;
+    --bg-pmr: #ffffff;
+    --bg-snd: #f3f4f6;
+    --bg-dark: #1f2937;
+    --bd-snd: #e5e7eb;
+    --sp-cl0: #374151; /* Text color header */
+    --sp-cl1: #3b82f6; /* Accent color */
+    --mod-clr: #fffbeb;
+}
+
+/* Reset & Base */
+html, body { height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+
+/* --- CUSTOM SCHEDULER OVERRIDES --- */
+/* The Scheduler Grid needs to be Row-Major for Days, unlike the Col-Major Sidebar Table */
+#scheduler-view {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100%;
+    overflow: hidden;
+}
+
+.scheduler-header {
+    display: flex;
+    flex-direction: row;
+    height: var(--table-hd-hgt);
+    border-bottom: 2px solid #d1d5db;
+    background: #f9fafb;
+}
+
+.scheduler-body {
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.scheduler-row {
+    display: flex;
+    flex-direction: row;
+    min-height: 80px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.day-header {
+    width: 80px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    background: #f3f4f6;
+    border-right: 2px solid #d1d5db;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+}
+
+.time-header-cell {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid #e5e7eb;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0 5px;
+    cursor: pointer;
+    position: relative;
+}
+.time-header-cell:hover { background-color: #e5e7eb; }
+
+.event-cell {
+    flex-grow: 1; /* Default grow, overridden by inline style for colspan simulation */
+    border-right: 1px solid #e5e7eb;
+    position: relative;
+    padding: 2px;
+    transition: all 0.2s;
+    min-width: 0; /* Fix flex overflow */
+}
+
+.event-cell:focus-within { z-index: 5; }
+
+/* Custom Input/Select UI */
+.custom-select-wrapper {
+    position: relative;
+    width: 100%;
+    font-size: 0.75rem;
+}
+.custom-select-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    outline: none;
+}
+.custom-select-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 150px;
+    max-height: 150px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 50;
+    display: none;
+    border-radius: 4px;
+}
+.custom-select-list.open { display: block; }
+.custom-select-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.custom-select-item:hover { background-color: #f3f4f6; }
+
+/* Drag & Drop Visuals */
+.event-cell.dragging { opacity: 0.4; }
+.event-cell.drag-over { border: 2px dashed var(--sp-cl1); background: rgba(59, 130, 246, 0.1); }
+
+/* Sidebar Resizer */
+.resizer {
+    width: 5px;
+    cursor: col-resize;
+    background: #e5e7eb;
+    transition: background 0.2s;
+}
+.resizer:hover { background: var(--sp-cl1); }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+/* Modal Overlay */
+.modal-overlay {
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(2px);
+}

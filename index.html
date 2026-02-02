@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Week Scheduler Pro</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Toast UI Editor -->
+    <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
+    <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+
+   <link rel="stylesheet" href="./style.css">
+   <link rel="stylesheet" href="./table.css">
+</head>
+<body class="flex flex-col text-gray-700">
+
+    <!-- HEADER -->
+    <header class="h-14 bg-white border-b border-gray-200 flex items-center px-4 justify-between shrink-0 z-20 shadow-sm">
+        <div class="flex items-center gap-4">
+            <button id="burger-btn" class="p-1 hover:bg-gray-100 rounded-md transition">
+                <span class="material-icons">menu</span>
+            </button>
+            <div class="flex items-center gap-2 text-xl font-bold text-blue-600">
+                <span class="material-icons">calendar_view_week</span>
+                <span>WeekScheduler</span>
+            </div>
+            <nav class="hidden md:flex gap-4 ml-6 text-sm font-medium text-gray-500">
+                <a href="#" class="hover:text-blue-600 transition">Dashboard</a>
+                <a href="#" class="text-blue-600">Scheduler</a>
+                <a href="#" class="hover:text-blue-600 transition">Reports</a>
+            </nav>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="text-right hidden sm:block">
+                <div class="text-sm font-bold">User Name</div>
+                <div class="text-xs text-gray-400">Pro Plan</div>
+            </div>
+            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border border-blue-200">
+                U
+            </div>
+        </div>
+    </header>
+
+    <!-- BODY -->
+    <div class="flex flex-1 overflow-hidden relative">
+        
+        <!-- SIDEBAR (Tags) -->
+        <aside id="sidebar" class="bg-gray-50 border-r border-gray-200 flex flex-col w-80 relative shrink-0 transition-all duration-300">
+            <div class="p-3 border-b border-gray-200 font-bold text-gray-600 flex justify-between items-center">
+                <span>Categorie & Tag</span>
+                <button onclick="addNewTag()" class="p-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 material-icons text-sm">add</button>
+            </div>
+            <div id="tags-table-container" class="flex-1 relative">
+                <!-- Table.js will render here -->
+            </div>
+            
+            <!-- Resizer Handle -->
+            <div id="sidebar-resizer" class="resizer absolute top-0 right-0 h-full w-1 z-10"></div>
+        </aside>
+
+        <!-- MAIN CONTENT (Scheduler) -->
+        <main class="flex-1 flex flex-col bg-white min-w-0 relative">
+            <div id="scheduler-view" class="w-full">
+                <!-- Header: Time Slots -->
+                <div class="scheduler-header pr-2" id="scheduler-header-row">
+                    <div class="day-header">Giorno</div>
+                    <!-- Time slots inserted via JS -->
+                </div>
+                <!-- Body: Days Rows -->
+                <div class="scheduler-body custom-scroll" id="scheduler-body-container">
+                    <!-- Rows inserted via JS -->
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="h-10 bg-gray-100 border-t border-gray-200 flex items-center justify-between px-4 shrink-0 text-xs">
+        <div class="flex gap-2">
+            <button onclick="promptAddColumn()" class="flex items-center gap-1 px-3 py-1 bg-white border rounded shadow-sm hover:bg-blue-50">
+                <span class="material-icons text-sm">add_circle</span> Agg. Colonna
+            </button>
+            <div class="h-4 w-px bg-gray-300 mx-1"></div>
+            <span id="status-bar" class="text-gray-500 italic">Pronto</span>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="app.exportJson()" class="flex items-center gap-1 px-3 py-1 bg-white border rounded hover:text-green-600">
+                <span class="material-icons text-sm">download</span> JSON
+            </button>
+            <button onclick="document.getElementById('file-upload').click()" class="flex items-center gap-1 px-3 py-1 bg-white border rounded hover:text-orange-600">
+                <span class="material-icons text-sm">upload</span> Importa
+            </button>
+            <input type="file" id="file-upload" class="hidden" accept=".json,.csv" onchange="app.importFile(this)">
+        </div>
+    </footer>
+
+    <!-- MODALS -->
+    
+    <!-- Column Edit Modal -->
+    <div id="modal-column" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-lg shadow-xl w-96 p-6">
+            <h3 class="text-lg font-bold mb-4">Modifica Colonna</h3>
+            <input type="hidden" id="col-edit-index">
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500">Inizio</label>
+                    <input type="time" id="col-start" class="w-full border p-1 rounded">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500">Fine</label>
+                    <input type="time" id="col-end" class="w-full border p-1 rounded">
+                </div>
+            </div>
+            
+            <div class="mb-4 hidden" id="col-conflict-area">
+                <p class="text-sm text-amber-600 mb-2 font-bold">Modifica strutturale rilevata:</p>
+                <div class="flex flex-col gap-2">
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="radio" name="col_mode" value="adjust" checked> 
+                        <span><b>Adatta intestazioni</b> (ridimensiona celle)</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="radio" name="col_mode" value="shift"> 
+                        <span><b>Slitta/Inserisci</b> (inserisci spazio)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-6">
+                <button onclick="app.deleteColumn()" class="text-red-500 text-sm font-bold hover:underline">Elimina</button>
+                <div class="flex gap-2">
+                    <button onclick="closeModal('modal-column')" class="px-3 py-1 text-gray-500">Annulla</button>
+                    <button onclick="app.saveColumnEdit()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Salva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Detail Modal (Toast UI) -->
+    <div id="modal-event" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-lg shadow-xl w-[90vw] h-[90vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-700">Dettagli Evento</h3>
+                <button onclick="closeModal('modal-event')" class="text-gray-400 hover:text-gray-700 material-icons">close</button>
+            </div>
+            <div class="p-4 flex-1 overflow-auto flex flex-col gap-4">
+                <input type="hidden" id="evt-id">
+                <div>
+                    <label class="block text-sm font-bold text-gray-600">Titolo</label>
+                    <input type="text" id="evt-title" class="w-full text-xl font-bold border-b-2 border-blue-200 focus:border-blue-600 outline-none py-2">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600">Tag</label>
+                        <select id="evt-tag-select" class="w-full border p-2 rounded bg-white"></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600">Orario (Informativo)</label>
+                        <div id="evt-time-display" class="p-2 bg-gray-100 rounded text-sm"></div>
+                    </div>
+                </div>
+                <div class="flex-1 flex flex-col">
+                    <label class="block text-sm font-bold text-gray-600 mb-1">Dettagli</label>
+                    <div id="editor-container"></div>
+                </div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
+                <button onclick="app.deleteEvent()" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded mr-auto">Elimina</button>
+                <button onclick="closeModal('modal-event')" class="px-4 py-2 border rounded bg-white">Annulla</button>
+                <button onclick="app.saveEventDetails()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold shadow hover:bg-blue-700">Salva Modifiche</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+<script src="./helper.js" defer></script>
+<script src="./table.js" defer></script>
+<script src="./script.js" defer></script>
+</body>
+</html>
