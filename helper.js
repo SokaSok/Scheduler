@@ -105,6 +105,17 @@ function parentEl(el, cls, self) {
     return el.closest('.' + cls);
 }
 
+// --------- TEXT --------
+/**
+ * Checks if text is an emoji and returns checked emoji or undefined 
+ * @param {string} text 
+ * @returns {string | undefined}
+ */
+function checkEmoji(text) {
+  const regex = /^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d]+$/u;
+  return regex.test(text) ? text : undefined;
+}
+
 // --- HSL COLOR UTILS ---
 function hslToHex(h, s, l) {
     l /= 100;
@@ -142,7 +153,6 @@ function hexToHsl(hex) {
     l = +(l * 100).toFixed(1);
     return {h, s, l};
 }
-
 
 // ---------------- Time ---------------
 // Formatter statico (creato una sola volta per tutta l'app) per performance

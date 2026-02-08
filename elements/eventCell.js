@@ -49,19 +49,14 @@ class EventCell extends Cell {
 
         // Listeners
         this.element.addEventListener('dragstart', this.handleDragStart);
-        this.element.addEventListener('dragend', this.handleDragEnd);
+        this.element.addEventListener('dragend', this.handleDragEnd);        
     }
 
     updateColors() {
-        if (typeof App !== 'undefined' && App.tagTable) {
-             const tag = App.tagTable.values.find(t => t.id === this.tagId) || App.tagTable.values[0];
-             this.element.style.backgroundColor = `hsl(${tag.h}, ${tag.bg_s}%, ${tag.bg_l}%)`;
-             this.element.style.borderLeftColor = `hsl(${tag.h}, ${tag.border_s}%, ${tag.border_l}%)`;
-             this.element.style.color = `hsl(${tag.h}, 50%, ${tag.text_l}%)`;
-        } else {
-             // Emergency visual fallback
-             this.element.classList.add('bg-blue-100', 'border-blue-500', 'text-blue-700');
-        }
+        const {bg, text, border} = getTagColors(this.tagId)
+        this.element.style.backgroundColor = bg
+        this.element.style.color = text
+        this.element.style.borderLeftColor = border
     }
 
     addElements() {
@@ -97,7 +92,7 @@ class EventCell extends Cell {
         let titleInput = createEl('span', {
             classes: 
             `time
-            w-full flex-1 p-1
+            w-22 max-w-full p-0.5 m-1
             bg-transparent text-xs`
         });
         this.element.appendChild(titleInput)
@@ -128,76 +123,38 @@ class EventCell extends Cell {
     }
 
     addTagSelector() {
-        // TODO: implement dedicated class
-        const tag = APP_STATE.tags.find(el => el.id === this.tagId)
-
-        let tagWrapper = createEl('div', { 
-            classes: `custom-select-wrapper mt-auto` });
-        let tagDisplay = createEl('div', {
-            classes: 
-            `flex items-center gap-1 
-            text-[12px] opacity-70 
-            hover:opacity-100 transition`,
-            innerHTML: `<span class="p-1">${tag.emoji}</span> <span>${tag.name}</span>`
-        });
-
-        let tagList = createEl('div', { 
-            classes: 
-            `custom-select-list` 
-        });
-
-        App.tagTable.values.forEach(t => {
-            let item = createEl('div', {
-                classes: 
-                `custom-select-item text-xs`,
-                innerHTML: `${t.emoji} ${t.name}`,
-                triggers: {
-                    click: (e) => {
-                        e.stopPropagation();
-                        this.tagId = t.id;
-                        this.updateColors();
-                    }
-                }
-            });
-            tagList.appendChild(item);
-        });
-
-        // Input for new tag in dropdown
-        let newTagInput = createEl('input', {
-            classes: `w-full border-t p-1 text-xs outline-none`,
-            attributes: { placeholder: 'Nuovo tag...' },
-            triggers: {
-                keydown: (e) => {
-                    if(e.key === 'Enter' && e.target.value) {
-                        const newTag = { 
-                            id: 't'+Date.now(), 
-                            name: e.target.value, 
-                            emoji: '🏷️', 
-                            h: Math.floor(Math.random()*360),
-                            bg_s: 85, bg_l: 92, border_s: 70, border_l: 40, text_l: 20
-                        };
-                        App.tagTable.values.push(newTag);
-                        this.tagId = newTag.id;
-                        // TODO: render all EventCells and tag table
-                        //this.renderAll();
-                    }
-                }
+        this.tagSelector = new TagSelector({
+            initialTagId: this.tagId,
+            onChange: (newId) => {
+                this.tagId = newId;
+                this.updateColors(); 
+                
+                // DOUBT: notify to SchedulerRow updating?
+                // this.notifyChange(); 
             }
         });
-        tagList.appendChild(newTagInput);
-        tagWrapper.appendChild(tagDisplay);
-        tagWrapper.appendChild(tagList);
-        
-        tagDisplay.addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.querySelectorAll('.custom-select-list')
-            .forEach(l => l !== tagList && l.classList.remove('open'));
-            tagList.classList.toggle('open');
-        });
 
-        this.element.appendChild(tagWrapper)
+        this.element.appendChild(this.tagSelector.element);
     }
 
+    /**
+     * Updates verticale position and height according to row-calculated layout.
+     * @param {number} laneIndex
+     * @param {number} totalLanes
+     * @param {number} span - How many lanes must be occupied (default 1)
+     */
+    updateVerticalLayout(laneIndex, totalLanes, span = 1) {
+        const singleLaneHeight = 100 / totalLanes;
+        const heightPct = singleLaneHeight * span;
+        const topPct = laneIndex * singleLaneHeight;
+
+        this.element.style.height = `${heightPct}%`;
+        this.element.style.top = `${topPct}%`;
+        this.element.style.transition = 'top 0.2s ease, height 0.2s ease';
+        
+        this.h = heightPct / 100;
+        this.y = topPct / 100;
+    }
 
     /**
      * Creates side grabbable anchors to trigger resizing
@@ -226,9 +183,8 @@ class EventCell extends Cell {
      * @param {MouseEvent} e 
      */
     handleDragStart = (e) => {
-        e.dataTransfer.effectAllowed = 'move';
         const rect = this.element.getBoundingClientRect();
-        const grabOffset = e.clientX - rect.left;
+        const grabOffsetX = e.clientX - rect.left;
 
         const payload = JSON.stringify({
             id: this.id,
@@ -239,22 +195,20 @@ class EventCell extends Cell {
             title: this.title,
             details: this.details,
             startOffsetMs: this.start.getTime(),
-            grabOffset
+            grabOffsetX
         });
-        e.dataTransfer.setData('application/json', payload);
 
-        // 1. Nascondiamo l'immagine di drag nativa (setDragImage non supportato ovunque, fallback img trasparente)
+        // Hiding native image (setDragImage may be not supported, fallback transparent img)
         const emptyImg = new Image();
         emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         e.dataTransfer.setDragImage(emptyImg, 0, 0);
 
-        // 2. Avviamo il nostro sistema visuale custom
-        // Passiamo l'elemento attuale per clonarlo
-        // Passiamo un oggetto payload decodificato per uso interno (più comodo del JSON string)
+        // Initializing DragState
         DragState.start(
             JSON.parse(payload), 
             this.element, 
-            e.clientX
+            e.clientX,
+            e.clientY
         );
         
         // Hiding of original element
@@ -262,9 +216,8 @@ class EventCell extends Cell {
     }
 
     handleDragEnd = (e) => {
-        // Ripuliamo il ghost
+        // Cleaning ghost element
         DragState.stop();
-        // Riportiamo l'originale visibile (nel caso il drop fallisca o sia una copia)
         this.element.classList.remove('opacity-0');
         this.element.classList.remove('opacity-50');
     }
@@ -305,37 +258,72 @@ class EventCell extends Cell {
     handleResizeMove = (e) => {
         if (!this.isResizing) return;
 
+        const parentRow = ROW_REGISTRY.get(this.dayIndex);
+        if (!parentRow) return;
+
         const deltaX = e.clientX - this.initialX;
-        let newWidth, newLeft;
+        const parentWidth = this.startState.parentWidth;
+        const totalDuration = parentRow.totalDuration;
+
+        let rawNewWidthPx = this.startState.width;
+        let rawNewLeftPx = this.startState.left;
 
         if (this.resizeSide === 'right') {
-            // Modifies just width
-            newWidth = Math.max(10, this.startState.width + deltaX); // Min 10px
-            this.element.style.width = `${newWidth}px`;
-            
-            // Updates this.w (percentage) for consistency
-            this.w = newWidth / this.startState.parentWidth;
+            rawNewWidthPx = Math.max(10, this.startState.width + deltaX);
         } else {
-            // Modifies left and width
-            // Note: positive deltaX moves to right (reduces width), negative to left (increases width)
-            newWidth = Math.max(10, this.startState.width - deltaX);
-            newLeft = this.startState.left + deltaX;
-
-            this.element.style.width = `${newWidth}px`;
-            this.element.style.left = `${newLeft}px`;
-            
-            // Updates this.x and this.w (percentage) for consistency
-            this.x = newLeft / this.startState.parentWidth;
-            this.w = newWidth / this.startState.parentWidth;
+            rawNewWidthPx = Math.max(10, this.startState.width - deltaX);
+            rawNewLeftPx = this.startState.left + deltaX;
         }
 
-        const {startMs, endMs} = this.calculateDatesFromGeometry()
+        // --- Snapping Logic ---
+        const availableSpace = 1 - SchedulerRow.headerWidth;
+        
+        // Start
+        const leftPct = rawNewLeftPx / parentWidth;
+        const timeXPct = Math.max(0, leftPct - SchedulerRow.headerWidth);
+        const rawStartRatio = timeXPct / availableSpace;
+        const rawStartMs = parentRow.start.getTime() + (rawStartRatio * totalDuration);
 
-        this.start = new Date(startMs)
-        this.end = new Date(endMs)
+        // Duaration
+        const widthPct = rawNewWidthPx / parentWidth;
+        const rawDurRatio = widthPct / availableSpace;
+        const rawDurationMs = rawDurRatio * totalDuration;
+        const rawEndMs = rawStartMs + rawDurationMs;
+
+        // Applying snap
+        let snappedStartMs = snapDateToGrid(new Date(rawStartMs)).getTime();
+        let snappedEndMs = snapDateToGrid(new Date(rawEndMs)).getTime();
+
+        // Validation
+        if (snappedEndMs - snappedStartMs < SNAP_MS) {
+            if (this.resizeSide === 'right') snappedEndMs = snappedStartMs + SNAP_MS;
+            else snappedStartMs = snappedEndMs - SNAP_MS;
+        }
+
+        // Convertion to Pixels
+        const snappedStartRatio = (snappedStartMs - parentRow.start.getTime()) / totalDuration;
+        const snappedDurationRatio = (snappedEndMs - snappedStartMs) / totalDuration;
+
+        // Spatial projection (inverse of SchedulerRow.calculateGeometryFromDates)
+        const snappedXPct = SchedulerRow.headerWidth + (snappedStartRatio * availableSpace);
+        const snappedWPct = snappedDurationRatio * availableSpace;
+
+        const finalLeftPx = snappedXPct * parentWidth;
+        const finalWidthPx = snappedWPct * parentWidth;
+
+        // Styling and position updating
+        this.element.style.width = `${finalWidthPx}px`;
+        if (this.resizeSide === 'left') {
+            this.element.style.left = `${finalLeftPx}px`;
+            this.x = snappedXPct;
+        }
+        
+        this.w = snappedWPct;
+        this.start = new Date(snappedStartMs);
+        this.end = new Date(snappedEndMs);
         this.updateTime();
     }
-
+ 
     /**
      * Calculates new start and end from element geometry.
      * Returns new dates in milliseconds.
@@ -411,5 +399,10 @@ class EventCell extends Cell {
             bubbles: true
         });
         this.element.dispatchEvent(event);
+    }
+
+    delete() {
+        this.tagSelector.delete()
+        super.delete()
     }
 }

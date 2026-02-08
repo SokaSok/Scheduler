@@ -39,15 +39,6 @@ html, body { height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', sans-
     flex-direction: column;
 }
 
-.scheduler-row {
-    display: flex;
-    flex-direction: row;
-    min-height: 80px;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-
-
 .event-cell:focus-within { z-index: 5; }
 
 /* Custom Input/Select UI */
@@ -86,10 +77,6 @@ html, body { height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', sans-
     gap: 5px;
 }
 .custom-select-item:hover { background-color: #f3f4f6; }
-
-/* Drag & Drop Visuals */
-.event-cell.dragging { opacity: 0.4; }
-.event-cell.drag-over { border: 2px dashed var(--sp-cl1); background: rgba(59, 130, 246, 0.1); }
 
 /* Sidebar Resizer */
 .resizer {

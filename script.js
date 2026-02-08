@@ -3,6 +3,54 @@ const bodyContainer = document.getElementById('scheduler-body-container');
 const headerContainer = document.getElementById('scheduler-header-container');
 
 const ROW_REGISTRY = new Map();
+const SNAP_MINUTES = 10;
+const SNAP_MS = SNAP_MINUTES * 60 * 1000;
+
+/**
+ * Rounds date to nearest grid step
+ * @param {Date} date 
+ * @returns {Date}
+ */
+function snapDateToGrid(date) {
+    const ms = date.getTime();
+    const snappedMs = Math.round(ms / SNAP_MS) * SNAP_MS;
+    return new Date(snappedMs);
+}
+
+/**
+ * Verifica se due range temporali si sovrappongono
+ */
+function checkOverlap(startA, endA, startB, endB) {
+    return (startA < endB) && (endA > startB);
+}
+
+/**
+ * Returns colors calcolated per a specific Tag ID.
+ * @param {string} tagId 
+ * @returns {{ bg: string, border: string, text: string }}
+ */
+function getTagColors(tagId) {
+    // Default fallback (Blue style)
+    const fallback = {
+        bg: '#dbeafe',       // blue-100
+        border: '#3b82f6',   // blue-500
+        text: '#1d4ed8'      // blue-700
+    };
+
+    if (!tagId || typeof App === 'undefined' || !App.tagTable) {
+        return fallback;
+    }
+
+    const tag = App.tagTable.values.find(t => t.id === tagId) || App.tagTable.values[0];
+
+    if (!tag) return fallback;
+
+    return {
+        bg: `hsl(${tag.h}, ${tag.bg_s}%, ${tag.bg_l}%)`,
+        border: `hsl(${tag.h}, ${tag.border_s}%, ${tag.border_l}%)`,
+        text: `hsl(${tag.h}, 50%, ${tag.text_l}%)`
+    };
+}
 
 // --- APP LOGIC ---
 

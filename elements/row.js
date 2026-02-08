@@ -32,7 +32,7 @@ class SchedulerRow {
         this.isDroppable = isDroppable
         this.classes = `
         relative flex flex-row min-h-[120px]
-        border-b-1 border-[color:var(--bd-snd)]
+        border-b-2 border-[color:var(--bd-snd)]
         scheduler-row
         ${classes}`;
         this.render()
@@ -43,9 +43,7 @@ class SchedulerRow {
         if (this.isDroppable) {
             this.element.addEventListener('dragover', this.onDragOver);
             this.element.addEventListener('drop', this.onDrop);
-            this.element.addEventListener('dragleave', () => {
-                this.element.classList.remove('bg-gray-50');
-            });
+            this.element.addEventListener('dragleave', this.onDragLeave);
             // Bubbling from EventCell end resize event.
             this.element.addEventListener('event-resize', this.onEventResize);
         }
@@ -71,6 +69,97 @@ class SchedulerRow {
     }
 
     /**
+     * Recalculates vertical layout if its EventCells to handle overlapping.
+     * "Lane Packing" algorithm:
+     * 1. Sorts events by start property.
+     * 2. Groups overlapping events (Cluster).
+     * 3. Assigns every event to first free lane.
+     * 4. Updates DOM.
+     */
+    updateLayout() {
+        if (this.events.length === 0) return;
+
+        // 1. Reset and sorting
+        const sortedEvents = [...this.events].sort((a, b) => a.start.getTime() - b.start.getTime());
+
+        // 2. Clusters
+        const clusters = [];
+        let currentCluster = [];
+        let clusterEnd = 0;
+
+        sortedEvents.forEach(evt => {
+            const evtStart = evt.start.getTime();
+            const evtEnd = evt.end.getTime();
+
+            // If event starts after current cluster end, group is closed
+            if (currentCluster.length > 0 && evtStart >= clusterEnd) {
+                clusters.push(currentCluster);
+                currentCluster = [];
+                clusterEnd = 0;
+            }
+
+            // Adds event to cluster
+            currentCluster.push(evt);
+            // Extends cluster end
+            if (evtEnd > clusterEnd) {
+                clusterEnd = evtEnd;
+            }
+        });
+        // Last cluster push
+        if (currentCluster.length > 0) clusters.push(currentCluster);
+
+        // 3. Assignment
+        clusters.forEach(cluster => {
+            const lanesEndTimes = []; // To look at lane release
+
+            cluster.forEach(evt => {
+                let placed = false;
+                
+                // Gets first lane assignable to event
+                for (let i = 0; i < lanesEndTimes.length; i++) {
+                    if (evt.start.getTime() >= lanesEndTimes[i]) {
+                        evt.laneIndex = i;
+                        lanesEndTimes[i] = evt.end.getTime(); // Updates lane end
+                        placed = true;
+                        break;
+                    }
+                }
+
+                // New lane, if event not placed
+                if (!placed) {
+                    evt.laneIndex = lanesEndTimes.length;
+                    lanesEndTimes.push(evt.end.getTime());
+                }
+            });
+
+            // 4. Updates DOM
+            const maxLanes = lanesEndTimes.length;
+            cluster.forEach(evt => {
+                // Span calculation
+                let span = 1
+
+                for (let nextLane = evt.laneIndex + 1; nextLane < maxLanes; nextLane++) {
+                    // Detects collision with following events
+                    const collision = cluster.some(otherEvt => 
+                        otherEvt.laneIndex === nextLane &&
+                        // Intersection: (StartA < EndB) && (EndA > StartB)
+                        (evt.start.getTime() < otherEvt.end.getTime()) && 
+                        (evt.end.getTime() > otherEvt.start.getTime())
+                    );
+
+                    if (collision) {
+                        break; // Can't expand more
+                    }
+                    
+                    span++; // growns
+                }
+
+                evt.updateVerticalLayout(evt.laneIndex, maxLanes, span);
+            });
+        });
+    }
+
+    /**
      * @param {TimeCell} cell 
      */
     append(cell) {
@@ -84,6 +173,7 @@ class SchedulerRow {
     appendEvent(eventCell) {
         this.events.push(eventCell);
         this.element.appendChild(eventCell.element);
+        this.updateLayout()
     }
     
     /**
@@ -100,6 +190,7 @@ class SchedulerRow {
             }
 
             this.events.splice(index, 1);
+            this.updateLayout()
             return true;
         }
         return false;
@@ -188,46 +279,50 @@ class SchedulerRow {
         this.appendEvent(newEvent);
     }
 
-    
+    /**
+     * 
+     * @param {MouseEvent} e 
+     */
     onDragOver = (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         
-        // Ottimizzazione: se non c'è ghost attivo, non calcolare nulla
-        if (!DragState.isDragging || !DragState.ghostElement) return;
+        if (!DragState.isDragging || !DragState.ghostElement || !DragState.payload) return;
 
         this.element.classList.add('bg-gray-50');
 
-        // --- 1. Calcolo Posizione Temporale (Logica simile a onDrop) ---
+        // Time based position
         const rect = this.element.getBoundingClientRect();
-        
-        // Mouse X relativo alla riga
         const mouseX = e.clientX - rect.left;
+        const elementLeftPx = mouseX - DragState.grabOffsetX;
         
-        // Usiamo l'offset salvato nel DragState per capire dove inizierebbe l'elemento
-        const elementLeftPx = mouseX - DragState.grabOffset;
-        
+        // Clamp (Header width and right boundary)
         let visualX = elementLeftPx / rect.width;
-        
-        // Clamp (Header width e limiti dx)
-        // Nota: serve width percentuale dell'evento (w) per il clamp destro.
-        // Lo recuperiamo dal payload del DragState
         const eventW = DragState.payload.w; 
-        
         visualX = Math.max(SchedulerRow.headerWidth, visualX);
         visualX = Math.min(1 - eventW, visualX);
 
-        // --- 2. Conversione in Date ---
-        const newStart = this.calculateDateFromVisualX(visualX);
+        // --- 2. Calcolo Date con SNAPPING ---
+        // Prima otteniamo la data grezza basata sulla posizione esatta del mouse
+        const rawStart = this.calculateDateFromVisualX(visualX);
+        // POI la arrotondiamo alla griglia (es. 09:15, 09:30)
+        const snappedStart = snapDateToGrid(rawStart);
         const duration = DragState.payload.durationMs;
+        const snappedEnd = new Date(snappedStart.getTime() + duration);
+        
+        // Dates convertion
+        const newStart = this.calculateDateFromVisualX(visualX);
         const newEnd = new Date(newStart.getTime() + duration);
 
-        // --- 3. Formattazione Testo ---
-        // Assumo tu abbia timeFormatter2Digit disponibile globalmente o importato
-        const timeLabel = `${timeFormatter2Digit.format(newStart)} - ${timeFormatter2Digit.format(newEnd)}`;
+        // Placeholder projection
+        // Note: implicit snap to grid with rounding.
+        // const { x, w } = this.calculateGeometryFromDates(newStart, newEnd);
+        const { x, w } = this.calculateGeometryFromDates(snappedStart, snappedEnd);
+        this.updatePlaceholder(x, w, DragState.payload.tagId);
 
-        // --- 4. Aggiornamento Visivo del Ghost ---
-        // Passiamo le coordinate assolute (screen/client) per il posizionamento fixed
+        // Ghost updating
+        // const timeLabel = `${timeFormatter2Digit.format(newStart)} - ${timeFormatter2Digit.format(newEnd)}`;
+        const timeLabel = `${timeFormatter2Digit.format(snappedStart)} - ${timeFormatter2Digit.format(snappedEnd)}`;
         DragState.updateGhost(timeLabel, e.clientX, e.clientY);
     }
 
@@ -240,10 +335,13 @@ class SchedulerRow {
     onDrop = (e) => {
         e.preventDefault();
         this.element.classList.remove('bg-gray-50');
+        this.removePlaceholder()
 
-        const rawData = e.dataTransfer.getData('application/json');
-        if (!rawData) return;
-        const data = JSON.parse(rawData);
+        const data = DragState.payload;
+        if (!data) {
+            console.error('Drop failed: No payload in DragState!')
+            return
+        }
 
         // Old EvenCell removal
         const sourceRow = ROW_REGISTRY.get(data.sourceRowId);
@@ -265,7 +363,7 @@ class SchedulerRow {
         // Visual X calculation for drop (0.0 - 1.0)
         const rect = this.element.getBoundingClientRect();
         const dropX = e.clientX - rect.left;
-        const elementLeftPx = dropX - (data.grabOffset || 0);
+        const elementLeftPx = dropX - (data.grabOffsetX || 0);
 
         let visualX = elementLeftPx / rect.width;
         // visualX normalization
@@ -273,8 +371,12 @@ class SchedulerRow {
         visualX = Math.min(1 - data.w, visualX); // Do not exit from right
 
         // Convertion into new start
-        const newStart = this.calculateDateFromVisualX(visualX);
+        // const newStart = this.calculateDateFromVisualX(visualX);
         
+        // --- SNAPPING ANCHE QUI ---
+        const rawStart = this.calculateDateFromVisualX(visualX);
+        const newStart = snapDateToGrid(rawStart); // <--- Snap
+
         // New end calculation 
         // Note: Default duration is 1 hour
         const duration = data.durationMs || 3600000; 
@@ -300,6 +402,56 @@ class SchedulerRow {
     }
 
     /**
+     * 
+     * @param {MouseEvent} e 
+     */
+    onDragLeave = (e) => {
+        // Controllo fondamentale:
+        // Se stiamo "uscendo" dalla riga per "entrare" in un suo figlio (es. un altro evento),
+        // NON dobbiamo rimuovere il placeholder.
+        if (this.element.contains(e.relatedTarget)) return;
+
+        this.element.classList.remove('bg-gray-50');
+        this.removePlaceholder();
+    }
+
+    /**
+     * Draw or update dragged EventCell placeholder
+     * @param {number} x - Percentage left (0-1)
+     * @param {number} w - Percentage width (0-1)
+     * @param {string} tagId - Dragged EventCell tag ID
+     */
+    updatePlaceholder(x, w, tagId) {
+        if (!this.placeholder) {
+            this.placeholder = createEl('div', {
+                classes: `
+                    absolute top-1 bottom-1 z-0
+                    bg-blue-400/20 border-2 border-dashed border-blue-500 rounded
+                    pointer-events-none
+                `
+            });
+            this.element.appendChild(this.placeholder);
+        }
+
+        this.placeholder.style.left = `${x * 100}%`;
+        this.placeholder.style.width = `${w * 100}%`;
+
+        const colors = getTagColors(tagId);
+        this.placeholder.style.backgroundColor = colors.bg;
+        this.placeholder.style.borderColor = colors.border;
+    }
+
+    /**
+     * Removes dragged EventCell placeholder
+     */
+    removePlaceholder() {
+        if (this.placeholder) {
+            this.placeholder.remove();
+            this.placeholder = null;
+        }
+    }
+
+    /**
      * Callback on resize ending of EventCell.element.
      * Called by CelleEvent.handleResizeEnd
      */
@@ -307,6 +459,8 @@ class SchedulerRow {
         const { id, x, w } = e.detail;
         console.log(`Event ${id} resized. New X: ${x}, New W: ${w}`);
         // TODO: decide if update DB here or EventCell side?
+
+        this.updateLayout()
     }
 
 
