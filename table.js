@@ -37,6 +37,7 @@ class Table {
     *  no_commit_icon : [string],
     *  no_commit_msg : [string],
     *  is_editable : [boolean],
+    *  is_calendar_table : [boolean],
     *  properties : [Object],
     *  onUpdate : [function]
     * }} param0 

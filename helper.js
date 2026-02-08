@@ -52,6 +52,20 @@ const icone = {
 
         
 // --- HELPER FUNCTIONS (from request) ---
+/**
+ * 
+ * @param {string} tag 
+ * @param {{
+ *  attributes? : Record<string, string | number>,
+ *  properties? : Record<string, string | number>,
+ *  triggers?   : Record<string, Function>,
+ *  figli?      : HTMLElement[],
+ *  innerHTML?  : string,
+ *  innerText?  : string,
+ *  classes?    : string,
+ * }} varie 
+ * @returns {HTMLElement}
+ */
 function createEl(tag, varie) {
     var elem = document.createElement(tag);
     if (varie) {
@@ -127,4 +141,60 @@ function hexToHsl(hex) {
     s = +(s * 100).toFixed(1);
     l = +(l * 100).toFixed(1);
     return {h, s, l};
+}
+
+
+// ---------------- Time ---------------
+// Formatter statico (creato una sola volta per tutta l'app) per performance
+const timeFormatter2Digit = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit'
+});
+
+/**
+ * 
+ * @param {string | Date | number} dateInput 
+ * @returns {Date}
+ */
+function mondayOfWeek(dateInput) {
+  const d = new Date(dateInput);          // accetta Date o string/numero compatibile
+  d.setHours(0, 0, 0, 0);                 // opzionale: normalizza
+  const day = d.getDay();                 // 0=Dom ... 1=Lun ... 6=Sab
+  const diff = (day + 6) % 7;             // giorni da sottrarre per arrivare a Lun
+  d.setDate(d.getDate() - diff);
+  return d;
+}
+
+/**
+ * 
+ * @param {Date} tm 
+ */
+function getTimeToString(tm) {
+    return timeFormatter2Digit.format(tm)
+}
+
+/**
+ * String are in hh:mm format.
+ * Returns two dates setted to times passed by parameters and to actual day.
+ * @param {{
+ *  start : string,
+ *  end : string
+ * }} obj 
+ * @returns {
+ *  start : Date
+ *  end : Date
+ * }
+ */
+function getStartEndFromString(obj) {
+    const {start,end} = obj
+    const [hStart,mStart] = start.split(':').map(el => el*1)
+    const [hEnd,mEnd] = end.split(':').map(el => el*1)
+    const firstHour = new Date()
+    firstHour.setHours(hStart,mStart,0,0)
+    const lastHour = new Date()
+    lastHour.setHours(hEnd,mEnd,0,0);
+    return {
+        start : firstHour,
+        end : lastHour
+    }
 }

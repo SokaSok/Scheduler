@@ -1,20 +1,19 @@
+const schedulerContainer = document.getElementById('scheduler-view')
+const bodyContainer = document.getElementById('scheduler-body-container');
+const headerContainer = document.getElementById('scheduler-header-container');
+
+const ROW_REGISTRY = new Map();
+
 // --- APP LOGIC ---
 
 const APP_STATE = {
-    cols: [
-        { start: "08:00", end: "09:00" },
-        { start: "09:00", end: "10:00" },
-        { start: "10:00", end: "11:00" },
-        { start: "11:00", end: "12:00" },
-        { start: "12:00", end: "13:00" }
-    ],
-    days: ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"],
-    tags: [
-        { id: 't1', name: 'Lavoro', emoji: '💼', h: 210, bg_s: 80, bg_l: 90, border_s: 80, border_l: 40, text_l: 20, parent: null },
-        { id: 't2', name: 'Studio', emoji: '📚', h: 120, bg_s: 70, bg_l: 90, border_s: 70, border_l: 40, text_l: 20, parent: null },
-        { id: 't3', name: 'Pausa', emoji: '☕', h: 30, bg_s: 90, bg_l: 92, border_s: 90, border_l: 50, text_l: 20, parent: null }
-    ],
-    events: [
+    start   : mock_start,
+    end     : mock_end,
+    step    : mock_step,
+    cols    : undefined,
+    days    : Days,
+    tags    : mock_tags,
+    events  : [
         /* { id: 'e1', day: 0, colIndex: 0, colspan: 1, title: 'Meeting', tagId: 't1', details: '' } */
     ],
     editor: null
@@ -22,11 +21,36 @@ const APP_STATE = {
 
 const App = {
     init() {
+       this.calculateColumns();
         this.initSidebar();
         this.initScheduler();
         this.initResizers();
         this.initEditor();
         this.renderAll();
+    },
+
+    rows : [],
+
+    calculateColumns() {
+        const {start,end} = getStartEndFromString(APP_STATE)
+        const {step} = APP_STATE
+        const totalHours = (end - start) / (step*1000*60)
+
+        APP_STATE.cols = []
+
+        for (let i = 0; i < totalHours; i++) {
+            const millisimatedStep = step * 60 * 1000
+            const increment = i * millisimatedStep
+            const incrementedStart = new Date(start.getTime() + increment)
+            const incrementedEnd = new Date(new Date(incrementedStart).setMilliseconds(step*59*1000)) 
+ 
+            APP_STATE.cols.push({
+                start: incrementedStart,
+                end : incrementedEnd
+            })
+        }
+
+
     },
 
     initEditor() {
@@ -118,7 +142,7 @@ const App = {
         this.renderScheduler();
     },
 
-    renderScheduler() {
+    renderScheduler_old() {
         const headerRow = document.getElementById('scheduler-header-row');
         const bodyContainer = document.getElementById('scheduler-body-container');
         
@@ -133,6 +157,7 @@ const App = {
                 innerText: `${col.start} - ${col.end}`,
                 triggers: { click: () => this.openColumnModal(idx) }
             });
+
             headerRow.appendChild(th);
         });
 
@@ -173,6 +198,80 @@ const App = {
                 }
             }
             bodyContainer.appendChild(row);
+        });
+    },
+
+    renderScheduler() {
+        // Clear
+        for (let i = this.rows.length-1; i >= 0; i--) {
+            this.rows[i].delete()
+            this.rows.splice(i,1)
+        }
+
+        const {cols, days, step} = APP_STATE
+        const colWidth = (cols.length+1) * step * 2
+
+ 
+        const headerRow = new HeaderRow({ 
+            width : colWidth, 
+            id : 'scheduler-header-row',
+            start : APP_STATE.start,
+            end : APP_STATE.end,
+        })
+        headerContainer.appendChild(headerRow.element)
+        ROW_REGISTRY.set(headerRow.id, headerRow);
+        headerRow.append(new RowHeaderCell({ label : 'Giorno' }))
+        
+        // Render Body Rows
+        days.forEach((dayName, dayIndex) => {
+            
+
+
+            let row = new SchedulerRow({
+                width :  colWidth, 
+                dayIndex, 
+                id : dayIndex,
+                start : APP_STATE.start,
+                end : APP_STATE.end
+            })
+            ROW_REGISTRY.set(row.id,row)
+            
+            // Day Label
+            row.append(new RowHeaderCell({label :  dayName}));
+
+            // Cells
+            let colIndex = 0;
+            while (colIndex < cols.length) {
+                const currentColIndex = colIndex;
+                const {start, end} = cols[colIndex]
+                // Render Header
+                if (!dayIndex) {
+                    const colHeader = new ColHeaderCell({
+                        w : 1 / cols.length,
+                        start,
+                        end,
+                        x : colIndex / cols.length,
+                        onClick : (_ => this.openColumnModal(colIndex)).bind(this)
+                    })
+                    headerRow.append(colHeader)
+                }
+
+                let cell = new TimeCell({
+                    width : colWidth,
+                    dayIndex,
+                    start,
+                    end,
+                    onClick : row.onTimeCellClick,
+                    onDragOver : (e) => e.preventDefault(),
+                    onDrop : ((e) => this.handleDrop(e, dayIndex, currentColIndex)).bind(this)
+                })
+
+                row.append(cell);
+
+                colIndex++;
+
+            }
+            bodyContainer.appendChild(row.element);
         });
     },
 
@@ -282,7 +381,9 @@ const App = {
     },
 
     // --- EVENT ACTIONS ---
-    createEvent(dayIndex, colIndex) {
+    createEvent(dayIndex, e) {
+        console.log(e)
+        return
         const newEvt = {
             id: 'e' + Date.now(),
             day: dayIndex,
@@ -315,8 +416,8 @@ const App = {
     openColumnModal(index) {
         const col = APP_STATE.cols[index];
         document.getElementById('col-edit-index').value = index;
-        document.getElementById('col-start').value = col.start;
-        document.getElementById('col-end').value = col.end;
+        document.getElementById('col-start').value = getTimeToString(col.start)
+        document.getElementById('col-end').value = getTimeToString(col.end)
         document.getElementById('col-conflict-area').classList.remove('hidden'); // Always show options for now
         document.getElementById('modal-column').classList.remove('hidden');
     },
@@ -327,6 +428,7 @@ const App = {
         const end = document.getElementById('col-end').value;
         const mode = document.querySelector('input[name="col_mode"]:checked').value;
         
+        // TODO: fix to make coherent with HeaderCell
         if (mode === 'adjust') {
             APP_STATE.cols[index].start = start;
             APP_STATE.cols[index].end = end;

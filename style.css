@@ -4,9 +4,12 @@
     --bg-snd: #f3f4f6;
     --bg-dark: #1f2937;
     --bd-snd: #e5e7eb;
+    --bd-trd: #d1d5db;
     --sp-cl0: #374151; /* Text color header */
     --sp-cl1: #3b82f6; /* Accent color */
     --mod-clr: #fffbeb;
+    --bg-tbl-th-row: #f9fafb;
+    --bg-tbl-th-col: #f3f4f6;
 }
 
 /* Reset & Base */
@@ -18,7 +21,8 @@ html, body { height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', sans-
     display: grid;
     grid-template-rows: auto 1fr;
     height: 100%;
-    overflow: hidden;
+    overflow: auto;
+    position: relative;
 }
 
 .scheduler-header {
@@ -27,10 +31,10 @@ html, body { height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', sans-
     height: var(--table-hd-hgt);
     border-bottom: 2px solid #d1d5db;
     background: #f9fafb;
+
 }
 
 .scheduler-body {
-    overflow: auto;
     display: flex;
     flex-direction: column;
 }
@@ -42,42 +46,7 @@ html, body { height: 100%; margin: 0; padding: 0; font-family: 'Segoe UI', sans-
     border-bottom: 1px solid #e5e7eb;
 }
 
-.day-header {
-    width: 80px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    background: #f3f4f6;
-    border-right: 2px solid #d1d5db;
-    position: sticky;
-    left: 0;
-    z-index: 10;
-}
 
-.time-header-cell {
-    flex-grow: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-right: 1px solid #e5e7eb;
-    font-size: 0.85rem;
-    font-weight: 600;
-    padding: 0 5px;
-    cursor: pointer;
-    position: relative;
-}
-.time-header-cell:hover { background-color: #e5e7eb; }
-
-.event-cell {
-    flex-grow: 1; /* Default grow, overridden by inline style for colspan simulation */
-    border-right: 1px solid #e5e7eb;
-    position: relative;
-    padding: 2px;
-    transition: all 0.2s;
-    min-width: 0; /* Fix flex overflow */
-}
 
 .event-cell:focus-within { z-index: 5; }
 

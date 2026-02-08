@@ -66,10 +66,9 @@
 
         <!-- MAIN CONTENT (Scheduler) -->
         <main class="flex-1 flex flex-col bg-white min-w-0 relative">
-            <div id="scheduler-view" class="w-full">
+            <div id="scheduler-view" class="w-full ">
                 <!-- Header: Time Slots -->
-                <div class="scheduler-header pr-2" id="scheduler-header-row">
-                    <div class="day-header">Giorno</div>
+                <div class="scheduler-header custom-scroll" id="scheduler-header-container">
                     <!-- Time slots inserted via JS -->
                 </div>
                 <!-- Body: Days Rows -->
@@ -181,7 +180,12 @@
 
     <!-- JAVASCRIPT LOGIC -->
 <script src="./helper.js" defer></script>
+<script src="./dragState.js" defer></script>
 <script src="./table.js" defer></script>
+<script src="./scheduler.js" defer></script>
+<script src="./elements/row.js" defer></script>
+<script src="./elements/cell.js" defer></script>
+<script src="./data.js" defer></script>
 <script src="./script.js" defer></script>
 </body>
 </html>
