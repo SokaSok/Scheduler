@@ -1,9 +1,23 @@
+/**
+ * @typedef {Object} SchedulerRowParams
+ * @property {number}   width       - Width of the html element: proportional to data range handled by the SchedulerRow (percentage: 0.0 to 1.0)
+ * @property {string?}  id          - Univoque ID. Header row hasn't it. In SchedulerRow is the dayIndex 0 based. 
+ * @property {string?}  dayIndex    - The same as the ID
+ * @property {string?}  classes     - Additional classes for rendering
+ * @property {Date}     start       - Start of the first schedulable time
+ * @property {Date}     end         - End of the last schedulable time
+ * @property {boolean?} isDroppable - If true, can be destination for dragged EventCell
+ */
+
 class SchedulerRow {
+    /**
+     * @param {SchedulerRowParams} param0 
+     */
     constructor({
         width,
         id,
         dayIndex,
-        classes,
+        classes = '',
         start,
         end,
         isDroppable = true
@@ -17,12 +31,8 @@ class SchedulerRow {
         this.end = _end
         this.isDroppable = isDroppable
         this.classes = `
-        relative
-        flex
-        flex-row
-        min-h-[80px]
-        border-b-1
-        border-[color:var(--bd-snd)]
+        relative flex flex-row min-h-[120px]
+        border-b-1 border-[color:var(--bd-snd)]
         scheduler-row
         ${classes}`;
         this.render()
@@ -30,19 +40,21 @@ class SchedulerRow {
         this.child = []
         this.events = []
 
-        // Configurazioni per il drag & drop
         if (this.isDroppable) {
             this.element.addEventListener('dragover', this.onDragOver);
             this.element.addEventListener('drop', this.onDrop);
             this.element.addEventListener('dragleave', () => {
                 this.element.classList.remove('bg-gray-50');
             });
-            // Listener per il resize (bubbling dall'EventCell)
+            // Bubbling from EventCell end resize event.
             this.element.addEventListener('event-resize', this.onEventResize);
         }
 
     }
 
+    /**
+     * Offset for row header (percentage)
+     */
     static headerWidth = 0.05;
 
     render() {
@@ -58,16 +70,26 @@ class SchedulerRow {
         })
     }
 
+    /**
+     * @param {TimeCell} cell 
+     */
     append(cell) {
         this.child.push(cell)
         this.element.appendChild(cell.element)
     }
 
+    /**
+     * @param {EventCell} eventCell 
+     */
     appendEvent(eventCell) {
         this.events.push(eventCell);
         this.element.appendChild(eventCell.element);
     }
     
+    /**
+     * @param {string} eventId 
+     * @returns {boolean}
+     */
     removeEventById(eventId) {
         const index = this.events.findIndex(evt => evt.id === eventId);
         if (index > -1) {
@@ -89,66 +111,67 @@ class SchedulerRow {
         this.element.remove()
     }
 
-    // --- LOGICA DI PROIEZIONE (Tempo -> Spazio) ---
+    // --- Projection logic (Time -> Space) ---
     
     /**
-     * Converte una Data in coordinate X e W (Percentuali 0-1)
+     * Converts Date into X and W (0.0 - 1.0)
+     * @param {Date} eventStart 
+     * @param {Date} eventEnd 
+     * @returns {{
+     *  x : number,
+     *  w : number
+     * }}
      */
     calculateGeometryFromDates(eventStart, eventEnd) {
         const startMs = eventStart.getTime();
         const endMs = eventEnd.getTime();
         const durationMs = endMs - startMs;
 
-        // 1. Calcola la percentuale temporale pura (0.0 = inizio giornata, 1.0 = fine giornata)
+        // Time percentage calculation (0.0 = day beginning, 1.0 = day ending)
         const timeRatioStart = (startMs - this.start.getTime()) / this.totalDuration;
         const timeRatioDuration = durationMs / this.totalDuration;
 
-        // 2. Calcola lo spazio disponibile per il tempo (100% - Header)
+        // Time available space calculation (100% - Header)
         const availableSpace = 1 - SchedulerRow.headerWidth;
 
-        // 3. Proietta nello spazio visivo
-        // X = Header + (RatioTempo * SpazioDisponibile)
+        // Projection into visible space
         const x = SchedulerRow.headerWidth + (timeRatioStart * availableSpace);
-        
-        // W = RatioDurata * SpazioDisponibile
         const w = timeRatioDuration * availableSpace;
 
         return { x, w };
     }
 
     /**
-     * Converte una coordinata X visuale in una Data
+     * Converts visual X coordinate into Date
      */
     calculateDateFromVisualX(visualXPct) {
         const availableSpace = 1 - SchedulerRow.headerWidth;
         
-        // 1. Rimuovi l'offset dell'header
+        // Header offset removal
         let timeAreaX = visualXPct - SchedulerRow.headerWidth;
         
-        // 2. Normalizza (se x < 0 siamo nell'header, lo forziamo a 0)
+        // Normalization (if x < 0 forces to 0)
         timeAreaX = Math.max(0, timeAreaX);
         
-        // 3. Calcola il ratio temporale
+        // Time ratio calculation
         const timeRatio = Math.min(1, timeAreaX / availableSpace); // Clamp a 1 max
 
-        // 4. Converti in ms
+        // Convertion into ms
         const ms = this.start.getTime() + (timeRatio * this.totalDuration);
         return new Date(ms);
     }
 
     /**
-     * Questo è il metodo che passeremo alle TimeCell
-     * @param {Date} date - La data calcolata dalla cella
-     * @param {Object} cellContext - Altre info utili dalla cella (es. rect, dayIndex)
+     * Trigger to be passed to child TimeCells.
+     * Creates new EventCell at specified coordinates relative to SchedulerRow.element
+     * @param {Date} date - Date rapresented by TimeCell
+     * @param {Object} cellContext - Other infoes from TimeCell (es. rect, dayIndex) [actually don't used]
      */
     onTimeCellClick = (date, cellContext) => {
         const durationMs = 3600000; 
         const eventEnd = new Date(date.getTime() + durationMs);
         const { x, w } = this.calculateGeometryFromDates(date, eventEnd);
-        
-        // Durata evento default: 1 ora
-        console.log(App.tagTable.values[0].id)
-
+ 
         const newEvent = new EventCell({
             id: `evt-${Date.now()}`,
             x: x,
@@ -157,23 +180,62 @@ class SchedulerRow {
             start: date,
             end: eventEnd,
             tagId: App.tagTable.values[0].id,
+            dayIndex : this.id,
             title: 'New Event',
             isDraggable: true
         });
 
-
-        this.append(newEvent);
+        this.appendEvent(newEvent);
     }
 
     
     onDragOver = (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        
+        // Ottimizzazione: se non c'è ghost attivo, non calcolare nulla
+        if (!DragState.isDragging || !DragState.ghostElement) return;
+
         this.element.classList.add('bg-gray-50');
+
+        // --- 1. Calcolo Posizione Temporale (Logica simile a onDrop) ---
+        const rect = this.element.getBoundingClientRect();
+        
+        // Mouse X relativo alla riga
+        const mouseX = e.clientX - rect.left;
+        
+        // Usiamo l'offset salvato nel DragState per capire dove inizierebbe l'elemento
+        const elementLeftPx = mouseX - DragState.grabOffset;
+        
+        let visualX = elementLeftPx / rect.width;
+        
+        // Clamp (Header width e limiti dx)
+        // Nota: serve width percentuale dell'evento (w) per il clamp destro.
+        // Lo recuperiamo dal payload del DragState
+        const eventW = DragState.payload.w; 
+        
+        visualX = Math.max(SchedulerRow.headerWidth, visualX);
+        visualX = Math.min(1 - eventW, visualX);
+
+        // --- 2. Conversione in Date ---
+        const newStart = this.calculateDateFromVisualX(visualX);
+        const duration = DragState.payload.durationMs;
+        const newEnd = new Date(newStart.getTime() + duration);
+
+        // --- 3. Formattazione Testo ---
+        // Assumo tu abbia timeFormatter2Digit disponibile globalmente o importato
+        const timeLabel = `${timeFormatter2Digit.format(newStart)} - ${timeFormatter2Digit.format(newEnd)}`;
+
+        // --- 4. Aggiornamento Visivo del Ghost ---
+        // Passiamo le coordinate assolute (screen/client) per il posizionamento fixed
+        DragState.updateGhost(timeLabel, e.clientX, e.clientY);
     }
 
     /**
-     * Gestisce il rilascio dell'evento (Spostamento)
+     * Handles EventCell drop into SchedulerRow.element
+     * 1. releases original EventCell
+     * 2. calculates new coordinates and new dates
+     * 3. creates a copy of dropped EventCell with updated infoes into the new parent
      */
     onDrop = (e) => {
         e.preventDefault();
@@ -183,39 +245,42 @@ class SchedulerRow {
         if (!rawData) return;
         const data = JSON.parse(rawData);
 
-        // Rimuovi vecchio elemento
+        // Old EvenCell removal
         const sourceRow = ROW_REGISTRY.get(data.sourceRowId);
+        let removed = false;
 
         if (sourceRow) {
-            // Rimuoviamo correttamente l'evento dalla memoria e dal DOM della vecchia riga
-            sourceRow.removeEventById(data.id);
-        } else {
-            // Fallback di emergenza se non troviamo la riga nel registro (es. rimozione manuale DOM)
+            removed = sourceRow.removeEventById(data.id);
+        } 
+        
+        // Emergency removal
+        if (!removed) {
             const oldDomElement = document.querySelector(`[data-id="${data.id}"]`);
-            if (oldDomElement) oldDomElement.remove();
+            if (oldDomElement) {
+                oldDomElement.remove();
+                console.warn(`Event ${data.id} removed via DOM fallback (Logic removal failed).`);
+            }
         }
 
-        // 1. Calcola posizione X visuale del drop (0.0 - 1.0)
+        // Visual X calculation for drop (0.0 - 1.0)
         const rect = this.element.getBoundingClientRect();
         const dropX = e.clientX - rect.left;
         const elementLeftPx = dropX - (data.grabOffset || 0);
 
         let visualX = elementLeftPx / rect.width;
-        // Assicuriamoci che l'evento non finisca dentro l'Header o fuori a destra
-        // Nota: static HEADER_WIDTH_PCT è il tuo 0.05
-        visualX = Math.max(SchedulerRow.headerWidth, visualX); // Non andare a sinistra dell'header
-        visualX = Math.min(1 - data.w, visualX); // Non uscire a destra
+        // visualX normalization
+        visualX = Math.max(SchedulerRow.headerWidth, visualX); // Do not exit form left
+        visualX = Math.min(1 - data.w, visualX); // Do not exit from right
 
-        // 2. Converti la X visuale in Data di Inizio
+        // Convertion into new start
         const newStart = this.calculateDateFromVisualX(visualX);
         
-        // 3. Calcola la Data di Fine usando la durata originale dell'evento trascinato
-        // (Se non hai durationMs nel data transfer, calcolalo da data.w usando la formula inversa)
+        // New end calculation 
+        // Note: Default duration is 1 hour
         const duration = data.durationMs || 3600000; 
         const newEnd = new Date(newStart.getTime() + duration);
 
-        // 4. Ricalcola X e W precisi basati sulle date
-        // Questo passaggio è fondamentale: "Snap to Grid" implicito e correzione errori di arrotondamento
+        // New x and w from start and end
         const { x, w } = this.calculateGeometryFromDates(newStart, newEnd);
 
         const movedEvent = new EventCell({
@@ -227,19 +292,21 @@ class SchedulerRow {
             end: newEnd,
             tagId: data.tagId,
             title: data.title,
-            details: data.details
-        });
+            details: data.details,
+            dayIndex : this.id
+        })
 
         this.appendEvent(movedEvent);
     }
 
     /**
-     * Callback chiamata quando un evento finisce di essere ridimensionato
+     * Callback on resize ending of EventCell.element.
+     * Called by CelleEvent.handleResizeEnd
      */
     onEventResize = (e) => {
         const { id, x, w } = e.detail;
         console.log(`Event ${id} resized. New X: ${x}, New W: ${w}`);
-        // Qui aggiorneresti il database o lo state globale
+        // TODO: decide if update DB here or EventCell side?
     }
 
 
@@ -250,8 +317,10 @@ class HeaderRow extends SchedulerRow {
         super({
             ...params,
             classes : 
-            `!min-h-[40px]
-            !border-b-0`,
+            `header-row
+            !min-h-[40px]
+            !border-b-0
+            ${params.classes || ''}`,
             isDroppable : false
         })
     }
