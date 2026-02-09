@@ -10,6 +10,7 @@ class TagSelector {
         this.isOpen = false;
         
         this.render();
+        window.addEventListener('app:tags-updated', this.handleTagsUpdated);
     }
 
     render() {
@@ -118,18 +119,23 @@ class TagSelector {
             };
             
             // Updates tags
-            // TODO: call global function
-            // - update tags list
-            // - update sidebar table
-            if (App.tagTable) {
-                App.tagTable.values.push(newTag);
-            }
+            TagManager.addTags([newTag]); 
             
             this.selectTag(newTag.id);
-            
             e.target.value = '';
-            this.renderListItems(); 
-            this.renderNewTagInput();
+
+            // this.renderListItems(); 
+            // this.renderNewTagInput();
+        }
+    }
+
+    handleTagsUpdated = (e) => {
+        // Ricostruisci la lista (è veloce, sono pochi elementi DOM)
+        this.renderListItems();
+        
+        // Se il tag attualmente selezionato è stato modificato, aggiorna la label visibile
+        if (e.detail.action === 'update' && e.detail.tags.some(({id}) => id === this.currentTagId)) {
+            this.updateDisplay();
         }
     }
 
@@ -180,6 +186,8 @@ class TagSelector {
     }
 
     delete() {
+        window.removeEventListener('app:tags-updated', this.handleTagsUpdated);
+
         if (this.isOpen) {
             document.removeEventListener('click', this.handleOutsideClick);
         }

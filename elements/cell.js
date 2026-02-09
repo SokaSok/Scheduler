@@ -38,9 +38,6 @@
  * }} HRowCellParams
  */
 
-
-
-
 class Cell {
     /**
      * @param {CellParams} param0 

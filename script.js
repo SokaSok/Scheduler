@@ -1,10 +1,18 @@
 const schedulerContainer = document.getElementById('scheduler-view')
 const bodyContainer = document.getElementById('scheduler-body-container');
 const headerContainer = document.getElementById('scheduler-header-container');
+const removeTagsBtn = document.getElementById('removeTagsBtn')
 
 const ROW_REGISTRY = new Map();
 const SNAP_MINUTES = 10;
 const SNAP_MS = SNAP_MINUTES * 60 * 1000;
+
+function logRows() {
+    console.clear()
+    for (const [key, value] of ROW_REGISTRY) {
+        console.log(`${key} : ${value.events.length}`, value.events);
+    }
+}
 
 /**
  * Rounds date to nearest grid step
@@ -137,7 +145,7 @@ const App = {
                                 obj.bg_s = 85; obj.bg_l = 92;
                                 obj.border_s = 70; obj.border_l = 40;
                                 obj.text_l = 20;
-                                this.renderAll();
+                                TagManager.updateTags([obj])
                             }
                         }
                     });
@@ -149,7 +157,7 @@ const App = {
                         classes: 'w-full bg-transparent border-none outline-none text-sm font-bold',
                         triggers: { change: ((e) => { 
                             obj.name = e.target.value; 
-                            this.renderAll(); 
+                            TagManager.updateTags([obj])
                         }).bind(this) }
                     });
                     container.appendChild(input);
@@ -157,7 +165,10 @@ const App = {
                     let input = createEl('input', {
                         attributes: { value: obj.emoji },
                         classes: 'w-full bg-transparent border-none outline-none text-center',
-                        triggers: { change: (e) => { obj.emoji = e.target.value; this.renderScheduler(); } }
+                        triggers: { change: (e) => { 
+                            obj.emoji = e.target.value; 
+                            TagManager.updateTags([obj]) 
+                        } }
                     });
                     container.appendChild(input);
                 } else if (key === 'parent-select') {
@@ -171,13 +182,20 @@ const App = {
                     sel.addEventListener('change', (e) => { 
                         obj.parent = e.target.value || null;
                         // Inherit logic could go here
-                        this.renderAll(); 
+                        TagManager.updateTags([obj])
                     });
                     container.appendChild(sel);
                 }
                 return container;
-            }).bind(this)
+            }).bind(this),
+            select_handler : _ => {
+                const someSelected = App.tagTable.values.some(el => el.__selected)
+                removeTagsBtn.disabled = !someSelected
+                console.log(!someSelected,removeTagsBtn.disabled)
+            }
         });
+
+        window.addEventListener('app:tags-updated', (e) => this.tagTable.refresh())
     },
 
     // --- SCHEDULER RENDERER ---
@@ -605,8 +623,15 @@ function promptAddColumn() {
 }
 
 function addNewTag() {
-    App.tagTable.values.push({ id: 't'+Date.now(), name: 'Nuovo', emoji: '🏷️', h: 200, bg_s: 90, bg_l: 90, border_s: 70, border_l: 40, text_l: 20 });
-    App.renderAll();
+    TagManager.generateRandomTag()
+}
+
+function removeTags() {
+    TagManager.deleteTags(
+        App.tagTable.values
+        .filter(({__selected}) => __selected)
+        .map(({id}) => id)
+    )
 }
 
 function closeModal(id) {

@@ -277,6 +277,7 @@ class SchedulerRow {
         });
 
         this.appendEvent(newEvent);
+        logRows()
     }
 
     /**
@@ -399,6 +400,8 @@ class SchedulerRow {
         })
 
         this.appendEvent(movedEvent);
+
+        logRows()
     }
 
     /**

@@ -29,14 +29,15 @@ class EventCell extends Cell {
             classes : 
             `event-cell
             absolute z-8
-            cursor-pointer select-none
+            cursor-default 
+            select-none
             flex flex-col gap-1
             group
             border-l-4 rounded shadow-sm 
             text-xs              
             ${params.classes || ''}`,
             y : 0,
-            isDraggable : true
+            isDraggable : false
         })
         this.tagId = params.tagId
         this.title = params.title
@@ -47,9 +48,11 @@ class EventCell extends Cell {
         this.addElements()
         this.renderResizeHandles();
 
-        // Listeners
+        // Listeners (to trigger only when draggable=true)
         this.element.addEventListener('dragstart', this.handleDragStart);
-        this.element.addEventListener('dragend', this.handleDragEnd);        
+        this.element.addEventListener('dragend', this.handleDragEnd);    
+        
+        window.addEventListener('app:tags-updated', this.handleTagsUpdated);
     }
 
     updateColors() {
@@ -90,10 +93,26 @@ class EventCell extends Cell {
 
     addTime() {
         let titleInput = createEl('span', {
-            classes: 
-            `time
-            w-22 max-w-full p-0.5 m-1
-            bg-transparent text-xs`
+            classes: `
+                time
+                w-22 max-w-full p-0.5 m-1
+                bg-transparent text-xs
+                cursor-grab active:cursor-grabbing 
+                hover:bg-black/5 rounded
+            `,
+            triggers : {
+                'mousedown': (e) => {
+                    e.stopPropagation(); 
+                    this.element.draggable = true;
+                    
+                    const removeDraggable = () => {
+                        this.element.draggable = false;
+                        document.removeEventListener('mouseup', removeDraggable)
+                    } 
+            
+                    document.addEventListener('mouseup', removeDraggable);
+                }
+            }
         });
         this.element.appendChild(titleInput)
         this.updateTime()
@@ -135,6 +154,16 @@ class EventCell extends Cell {
         });
 
         this.element.appendChild(this.tagSelector.element);
+    }
+
+    handleTagsUpdated = (e) => {
+        // Ottimizzazione: Aggiorna solo se l'evento riguarda il mio tag
+        // Oppure aggiorna sempre se è un 'update' generico
+        const { action, tags } = e.detail;
+
+        if (action === 'update' && tags.some(({id}) => id === this.tagId)) {
+            this.updateColors();
+          }
     }
 
     /**
@@ -220,6 +249,8 @@ class EventCell extends Cell {
         DragState.stop();
         this.element.classList.remove('opacity-0');
         this.element.classList.remove('opacity-50');
+
+        this.element.draggable = false;
     }
 
     // --- Resizing logic (Mouse Events) ---
@@ -381,6 +412,8 @@ class EventCell extends Cell {
 
         // Notify updates to controller/row to save them.
         this.sendInfoesToParent();
+
+        logRows()
     }
 
     /**
@@ -402,6 +435,7 @@ class EventCell extends Cell {
     }
 
     delete() {
+        window.removeEventListener('app:tags-updated', this.handleTagsUpdated);
         this.tagSelector.delete()
         super.delete()
     }

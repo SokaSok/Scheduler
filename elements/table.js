@@ -396,6 +396,9 @@ class Table {
         [...this.table.querySelectorAll(`.cell:not(.header)[data-id="${id}"]`)]
         .forEach(c => {c.classList.toggle('selected',is_selected)})
 
+        const item = this.get_list().find((el) => el.id === id)
+        if (item) item.__selected = is_selected
+
         if (not_check_all_cb) return
         const all_cb = this.table.querySelector('.cell.header:nth-child(1) input[type="checkbox"]')
         if (!all_cb) return
@@ -407,7 +410,6 @@ class Table {
         all_cb.indeterminate = !are_all_selected && checked_rows
       
     }
-
     
     /**
      * 

@@ -1,0 +1,50 @@
+[x] Spostare onDrag di EventCell su suo span.time
+[x] Controllare l'effettiva rimozione degli EventCell dai SchedulerRow 
+    --> Sovrapposizione non coerente
+[x] Creare Funzione per aggiornare tag chiamabile da TagSelector e da sidebar tabelle
+    [x] aggiorna sidebar tabella
+    [x] aggiorna tutti gli eventi
+[] Creare TagModal per nuovo tag
+    - hue color
+    - label
+    - emoji
+    - parent
+[] Rendere responsive EventCell
+[] Implementare EventModal con Toast UI
+    - title
+    - details
+    - tag
+    - start
+    - end
+    - day
+    - actions
+[] Implementare MiniEventModal
+    - actions
+[] Implementare ActionsMenu responsive
+    - mini -A MiniEventModal
+    - normal -> EventModal
+[] Creare classe export (riutilizzare funzioni di CreaLegende)
+    [] immagine
+        [] svg
+        [] png/jpeg
+    [] dati
+        [] csv
+        [] json
+        [] js (per debug)
+[] Creare classe import (riutilizzare function di CreaLegende)
+    [] json
+    [] csv
+[] Creare classe SideBar (riutilizzabile anche in altri progetti)
+[] Creare classe HeaderBar (riutilizzabile anche in altri progetti)
+[] Creare SettingModal
+    - step
+    - start
+    - end
+    - first day
+    - last day
+[] Convertire Table class 
+    - compatibile con Tilewind
+    - scorporazione elementi figli da gestire tramite classi separate --> pro NextJS
+    - aggiungere addItem, removeItem
+    - controllare se esiste logica updateItem
+    - rendere non animabile
