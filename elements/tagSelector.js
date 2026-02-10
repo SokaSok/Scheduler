@@ -17,21 +17,24 @@ class TagSelector {
         this.element = createEl('div', { 
             classes: `
                 tag-selector
-                relative mt-auto w-full`
+                relative mt-auto w-full
+                group
+            `
         });
 
+
+
         // Button
-        this.display = createEl('div', {
+        this.displayContainer = createEl('div', {
             classes: `
-                flex items-center gap-1 p-1
-                text-xs opacity-80 rounded
-                cursor-pointer transition-opacity 
-                hover:bg-black/5 hover:opacity-100 
+                w-full p-0.5
+                cursor-pointer transition-colors hover:bg-black/5 
             `,
             triggers: {
                 click: (e) => this.toggle(e)
-            }
+            },
         });
+
         
         // List
         this.list = createEl('div', { 
@@ -39,7 +42,7 @@ class TagSelector {
                 absolute z-50 left-0 right-0 bottom-full mb-1
                 bg-white border border-gray-200 shadow-lg rounded-md
                 flex flex-col gap-1 p-1
-                min-w-[120px] max-h-[150px] overflow-y-auto
+                min-w-[150px] max-h-[200px] overflow-y-auto
                 hidden
             `
         });
@@ -48,19 +51,25 @@ class TagSelector {
         this.renderNewTagInput();
         this.updateDisplay();
 
-        this.element.appendChild(this.display);
+        this.element.appendChild(this.displayContainer);
         this.element.appendChild(this.list);
     }
 
     /**
-     * Updates icon and label
+     * Renders the TagLabel component inside the display button
      */
     updateDisplay() {
-        const tag = this.getTag(this.currentTagId);
-        this.display.innerHTML = `
-            <span class="flex-shrink-0">${tag.emoji}</span> 
-            <span class="truncate font-medium">${tag.name}</span>
-        `;
+        this.displayContainer.innerHTML = '';
+        
+        const label = new TagLabel({
+            tagId: this.currentTagId,
+            className: 'w-full'
+        });
+
+        this.displayContainer.appendChild(label.element);
+
+        const {border} = getTagColors(this.currentTagId)
+        this.displayContainer.style.setProperty('background-color', border)
     }
 
     renderListItems() {
@@ -129,12 +138,21 @@ class TagSelector {
         }
     }
 
+    /**
+     * Handles global tag updates.
+     * Re-renders the dropdown list and updates the display badge if the current tag
+     * or any of its ancestors are affected by the changes.
+     * @param {CustomEvent} e 
+     */
     handleTagsUpdated = (e) => {
-        // Ricostruisci la lista (è veloce, sono pochi elementi DOM)
+        // 1. Always refresh the dropdown list options (names/colors might have changed)
         this.renderListItems();
         
-        // Se il tag attualmente selezionato è stato modificato, aggiorna la label visibile
-        if (e.detail.action === 'update' && e.detail.tags.some(({id}) => id === this.currentTagId)) {
+        const { tags } = e.detail;
+
+        // 2. Check if the currently selected tag (or its parents) is involved
+        // We use the centralized hierarchical check
+        if (TagManager.isTagAffected(this.currentTagId, tags)) {
             this.updateDisplay();
         }
     }

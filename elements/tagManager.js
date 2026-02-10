@@ -12,7 +12,6 @@
  */
 
 const TagManager = {
-    // Riferimento allo stato globale
     get tags() {
         return App.tagTable.values
     },
@@ -33,7 +32,7 @@ const TagManager = {
     },
 
     /**
-     * Aggiunge un nuovo tag e notifica tutti
+     * Adds tag and notifies the change
      * @param {Tag[]} newTags 
      */
     addTags(newTags) {
@@ -42,7 +41,7 @@ const TagManager = {
     },
 
     /**
-     * Aggiorna un tag esistente e notifica
+     * Updates tag and notifies the change
      * @param {Partial<Tag>[]} updatedTags 
      */
     updateTags(updatedTags) {
@@ -58,7 +57,7 @@ const TagManager = {
     },
 
     /**
-     * Rimuove un tag e notifica
+     * Deletestag notifies the change
      * @param {string[]} tagIds 
      */
     deleteTags(tagIds) {
@@ -78,7 +77,7 @@ const TagManager = {
     },
 
     /**
-     * Il cuore del sistema: lancia un evento personalizzato
+     * Launch global event
      * @param {string} action 
      * @param {Partial<Tag>[]} tags 
      */
@@ -88,7 +87,46 @@ const TagManager = {
         });
         window.dispatchEvent(event);
         
-        // Opzionale: Salva su LocalStorage/DB qui
+        // From here saving logic
         console.log(`Tags updated: ${action}`, tags);
-    }
+    },
+
+    /**
+     * Checks if a specific tag or any of its ancestors is involved in a list of modified tags.
+     * This ensures that if a Parent Tag changes color, the Child Tag (assigned to the event) detects the change.
+     * @param {string} eventTagId - The ID of the tag currently assigned to the event.
+     * @param {Array<{id: string}>} modifiedTags - The list of tags that have been updated/modified.
+     * @returns {boolean} True if the eventTag or one of its ancestors is in the modified list.
+     */
+    isTagAffected(eventTagId, modifiedTags) {
+        if (!eventTagId || !modifiedTags || modifiedTags.length === 0) return false;
+
+        // Optimize lookup by creating a Set of modified IDs
+        const modifiedIds = new Set(modifiedTags.map(t => t.id));
+
+        // Start checking from the current tag
+        let currentTag = this.tags.find(t => t.id === eventTagId);
+        
+        // Traverse up the hierarchy
+        let depth = 0;
+        const MAX_DEPTH = 10; // Safety break for potential circular refs
+
+        while (currentTag && depth < MAX_DEPTH) {
+            // Check if current level is modified
+            if (modifiedIds.has(currentTag.id)) {
+                return true;
+            }
+
+            // Move to parent
+            if (currentTag.parent) {
+                currentTag = this.tags.find(t => t.id === currentTag.parent);
+                depth++;
+            } else {
+                // Root reached
+                break;
+            }
+        }
+
+        return false;
+    },
 };

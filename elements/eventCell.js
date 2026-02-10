@@ -157,13 +157,11 @@ class EventCell extends Cell {
     }
 
     handleTagsUpdated = (e) => {
-        // Ottimizzazione: Aggiorna solo se l'evento riguarda il mio tag
-        // Oppure aggiorna sempre se è un 'update' generico
         const { action, tags } = e.detail;
 
-        if (action === 'update' && tags.some(({id}) => id === this.tagId)) {
+        if (action === 'update' && TagManager.isTagAffected(this.tagId, tags)) {
             this.updateColors();
-          }
+        }
     }
 
     /**

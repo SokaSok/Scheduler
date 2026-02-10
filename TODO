@@ -4,7 +4,7 @@
 [x] Creare Funzione per aggiornare tag chiamabile da TagSelector e da sidebar tabelle
     [x] aggiorna sidebar tabella
     [x] aggiorna tutti gli eventi
-[] Creare TagModal per nuovo tag
+[x] Creare TagModal per nuovo tag
     - hue color
     - label
     - emoji

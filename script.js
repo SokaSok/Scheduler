@@ -8,6 +8,7 @@ const SNAP_MINUTES = 10;
 const SNAP_MS = SNAP_MINUTES * 60 * 1000;
 
 function logRows() {
+    return
     console.clear()
     for (const [key, value] of ROW_REGISTRY) {
         console.log(`${key} : ${value.events.length}`, value.events);
@@ -49,7 +50,7 @@ function getTagColors(tagId) {
         return fallback;
     }
 
-    const tag = App.tagTable.values.find(t => t.id === tagId) || App.tagTable.values[0];
+    const tag = App.tagTable?.get_list().find(t => t.id === tagId) || App.tagTable.values[0];
 
     if (!tag) return fallback;
 
@@ -77,7 +78,8 @@ const APP_STATE = {
 
 const App = {
     init() {
-       this.calculateColumns();
+        this.calculateColumns();
+        this.initTagModal();
         this.initSidebar();
         this.initScheduler();
         this.initResizers();
@@ -118,6 +120,11 @@ const App = {
         });
     },
 
+    initTagModal() {
+        // Just instantiates the class. Rendering happens on open().
+        this.tagModal = new TagModal();
+    },
+
     // --- SIDEBAR (TAGS) ---
     initSidebar() {
         this.tagTable = new Table({
@@ -125,73 +132,33 @@ const App = {
             parent_element: document.getElementById('tags-table-container'),
             headers: [
                 { '': '' },
-                { 'Emoji': 'emoji' },
-                { 'Nome': 'name' },
-                { 'Padre': 'parent-select' },
-                { 'Color': 'color-input' },
+                { 'Tags': 'id' },
             ],
             values: [...APP_STATE.tags],
-            properties: { '--width': ['40px', '50px', 'auto', '80px', '60px'] },
-            f_object_formatter: ((key, obj, container) => {
-                if (key === 'color-input') {
-                    let input = createEl('input', {
-                        attributes: { type: 'color', value: hslToHex(obj.h, 100, 50) },
-                        classes: 'w-6 h-6 p-0 border-0 rounded cursor-pointer',
-                        triggers: {
-                            change: (e) => {
-                                const hsl = hexToHsl(e.target.value);
-                                obj.h = hsl.h;
-                                // Auto-generate harmonies
-                                obj.bg_s = 85; obj.bg_l = 92;
-                                obj.border_s = 70; obj.border_l = 40;
-                                obj.text_l = 20;
-                                TagManager.updateTags([obj])
-                            }
+            properties: { '--width': ['40px', 'calc(100% - 40px)'] },
+            f_object_formatter: (function(key, obj, container){
+                if (key === 'id') {
+                    container.innerHTML = ''; // Pulisci container
+                    container.className = 'w-full h-full p-1 flex items-center';
+
+                    // Istanza TagLabel standard
+                    const label = new TagLabel({
+                        tagId: obj.id,
+                        onClick: (e) => {
+                            // Gestione click: apre il modale ma non triggera il checkbox della riga
+                            e.stopPropagation();
+                            if (App.tagModal) App.tagModal.open(obj.id);
                         }
                     });
-                    container.style.overflow = 'hidden';
-                    container.appendChild(input);
-                } else if (key === 'name') {
-                    let input = createEl('input', {
-                        attributes: { value: obj.name },
-                        classes: 'w-full bg-transparent border-none outline-none text-sm font-bold',
-                        triggers: { change: ((e) => { 
-                            obj.name = e.target.value; 
-                            TagManager.updateTags([obj])
-                        }).bind(this) }
-                    });
-                    container.appendChild(input);
-                } else if (key === 'emoji') {
-                    let input = createEl('input', {
-                        attributes: { value: obj.emoji },
-                        classes: 'w-full bg-transparent border-none outline-none text-center',
-                        triggers: { change: (e) => { 
-                            obj.emoji = e.target.value; 
-                            TagManager.updateTags([obj]) 
-                        } }
-                    });
-                    container.appendChild(input);
-                } else if (key === 'parent-select') {
-                    let sel = createEl('select', { classes: 'w-full text-xs bg-transparent' });
-                    sel.add(new Option('-', ''));
-                    (this.tagTable?.values || APP_STATE.tags)
-                    .filter(t => t.id !== obj.id && t.parent !== obj.id).forEach(t => {
-                        sel.add(new Option(t.name, t.id));
-                    });
-                    sel.value = obj.parent || '';
-                    sel.addEventListener('change', (e) => { 
-                        obj.parent = e.target.value || null;
-                        // Inherit logic could go here
-                        TagManager.updateTags([obj])
-                    });
-                    container.appendChild(sel);
+
+                    container.appendChild(label.element);
+                    return container;
                 }
                 return container;
-            }).bind(this),
+            }),//.bind(this),
             select_handler : _ => {
                 const someSelected = App.tagTable.values.some(el => el.__selected)
                 removeTagsBtn.disabled = !someSelected
-                console.log(!someSelected,removeTagsBtn.disabled)
             }
         });
 
@@ -206,65 +173,6 @@ const App = {
     renderAll() {
         this.tagTable.refresh();
         this.renderScheduler();
-    },
-
-    renderScheduler_old() {
-        const headerRow = document.getElementById('scheduler-header-row');
-        const bodyContainer = document.getElementById('scheduler-body-container');
-        
-        // Clear
-        headerRow.innerHTML = '<div class="day-header">Giorno</div>';
-        bodyContainer.innerHTML = '';
-
-        // Render Header
-        APP_STATE.cols.forEach((col, idx) => {
-            let th = createEl('div', {
-                classes: 'time-header-cell',
-                innerText: `${col.start} - ${col.end}`,
-                triggers: { click: () => this.openColumnModal(idx) }
-            });
-
-            headerRow.appendChild(th);
-        });
-
-        // Render Body Rows
-        const {cols, days} = APP_STATE
-        days.forEach((dayName, dayIndex) => {
-            let row = createEl('div', { classes: 'scheduler-row' });
-            
-            // Day Label
-            row.appendChild(createEl('div', { classes: 'day-header', innerText: dayName }));
-
-            // Cells
-            let colIndex = 0;
-            while (colIndex < cols.length) {
-                const currentColIndex = colIndex;
-                const evt = APP_STATE.events.find(e => e.day === dayIndex && e.colIndex === currentColIndex);
-                if (evt) {
-                    // Event Cell
-                    let cell = this.createEventCell(evt);
-                    // Apply colspan
-                    let span = evt.colspan || 1;
-                    cell.style.width = `${(span / cols.length) * 100}%`; // Approximation
-                    row.appendChild(cell);
-                    colIndex += span;
-                } else {
-                    // Empty Cell
-                    let cell = createEl('div', {
-                        classes: `event-cell hover:bg-gray-50 w-[${1 / cols.length * 100}%]`,
-                        innerText : `row: ${dayIndex}, col: ${currentColIndex}`,
-                        triggers: {
-                            click: (() => this.createEvent(dayIndex, currentColIndex)).bind(this),
-                            dragover: (e) => e.preventDefault(),
-                            drop: ((e) => this.handleDrop(e, dayIndex, currentColIndex)).bind(this)
-                        }
-                    });
-                    row.appendChild(cell);
-                    colIndex++;
-                }
-            }
-            bodyContainer.appendChild(row);
-        });
     },
 
     renderScheduler() {
@@ -623,7 +531,12 @@ function promptAddColumn() {
 }
 
 function addNewTag() {
-    TagManager.generateRandomTag()
+    // TagManager.generateRandomTag()
+    if (App.tagModal) {
+        App.tagModal.open();
+    } else {
+        console.error("TagModal non inizializzato");
+    }
 }
 
 function removeTags() {
